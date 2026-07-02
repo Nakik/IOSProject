@@ -1,0 +1,42 @@
+# Expo
+/.expo/
+/dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build
+build/
+dist/
+.turbo/
+
+# OS
+.DS_Store
+Thumbs.db
