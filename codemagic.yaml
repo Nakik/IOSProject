@@ -1,0 +1,191 @@
+workflows:
+  expo-quality:
+    name: Expo Quality Checks
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      node: v22.13.1
+    triggering:
+      events:
+        - pull_request
+      branch_patterns:
+        - pattern: "*"
+          include: true
+          source: true
+    cache:
+      cache_paths:
+        - ~/.npm
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Typecheck
+        script: npm run typecheck
+      - name: Lint
+        script: npm run lint
+
+  expo-android-preview:
+    name: Expo Android Preview APK
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      node: v22.13.1
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "*"
+          include: true
+          source: true
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Run quality checks
+        script: npm run ci
+      - name: Generate Android project
+        script: npx expo prebuild --platform android --clean --non-interactive
+      - name: Set Android SDK location
+        script: echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Build Android debug APK
+        script: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+    artifacts:
+      - android/app/build/outputs/apk/debug/*.apk
+
+  expo-ios-simulator:
+    name: Expo iOS Simulator App
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      node: v22.13.1
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "*"
+          include: true
+          source: true
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/Library/Caches/CocoaPods
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Run quality checks
+        script: npm run ci
+      - name: Generate iOS project
+        script: npx expo prebuild --platform ios --clean --non-interactive
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+      - name: Build iOS simulator app without signing
+        script: |
+          IOS_WORKSPACE="$(find "$CM_BUILD_DIR/ios" -maxdepth 1 -name "*.xcworkspace" -print -quit)"
+          IOS_SCHEME="$(basename "$IOS_WORKSPACE" .xcworkspace)"
+          echo "Building workspace $IOS_WORKSPACE with scheme $IOS_SCHEME"
+          xcodebuild build \
+            -workspace "$IOS_WORKSPACE" \
+            -scheme "$IOS_SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+    artifacts:
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - /tmp/xcodebuild_logs/*.log
+
+  expo-android-release:
+    name: Expo Android Release AAB
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      node: v22.13.1
+      android_signing:
+        - ios_apps_upload_keystore
+      vars:
+        PACKAGE_NAME: "com.iosapps.app"
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Run quality checks
+        script: npm run ci
+      - name: Set Expo build numbers
+        script: node scripts/set-codemagic-build-version.js
+      - name: Generate Android project
+        script: npx expo prebuild --platform android --clean --non-interactive
+      - name: Configure Android signing
+        script: |
+          node scripts/configure-android-signing.js
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Build Android App Bundle
+        script: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew bundleRelease --no-daemon
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/mapping.txt
+
+  expo-ios-release:
+    name: Expo iOS Release IPA
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      node: v22.13.1
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.iosapps.app
+    cache:
+      cache_paths:
+        - ~/.npm
+        - ~/Library/Caches/CocoaPods
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Run quality checks
+        script: npm run ci
+      - name: Set Expo build numbers
+        script: node scripts/set-codemagic-build-version.js
+      - name: Generate iOS project
+        script: npx expo prebuild --platform ios --clean --non-interactive
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+      - name: Apply iOS signing profiles
+        script: xcode-project use-profiles --warn-only
+      - name: Build iOS IPA
+        script: |
+          IOS_WORKSPACE="$(find "$CM_BUILD_DIR/ios" -maxdepth 1 -name "*.xcworkspace" -print -quit)"
+          IOS_SCHEME="$(basename "$IOS_WORKSPACE" .xcworkspace)"
+          echo "Building workspace $IOS_WORKSPACE with scheme $IOS_SCHEME"
+          xcode-project build-ipa \
+            --workspace "$IOS_WORKSPACE" \
+            --scheme "$IOS_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM

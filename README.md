@@ -1,127 +1,100 @@
-# iOS Apps - Expo React Native
+# iOS Apps
 
-A modern Expo React Native application built with TypeScript and Expo CLI.
+Expo React Native app with TypeScript, push notification setup, and Codemagic CI/CD workflows for GitHub.
 
-## Features
-
-- ⚡ **Expo Framework** - Simplified React Native development
-- 📱 **Cross-Platform** - Build for iOS, Android, and Web
-- 🎨 **TypeScript** - Full type safety
-- 🧭 **React Navigation** - Smooth app navigation
-- 📦 **Modular Structure** - Well-organized project layout
-
-## Prerequisites
-
-- Node.js 16+ and npm/yarn
-- Expo CLI: `npm install -g expo-cli`
-- iOS Simulator (macOS only) or Android Emulator for local testing
-
-## Quick Start
-
-### Installation
+## Local Development
 
 ```bash
-npm install
-```
-
-### Development
-
-Start the Expo development server:
-
-```bash
+npm ci
 npm start
 ```
 
-Run on specific platforms:
+Run a platform target:
 
 ```bash
-npm run ios       # iOS Simulator (macOS only)
-npm run android   # Android Emulator
-npm run web       # Web browser
+npm run ios
+npm run android
+npm run web
 ```
 
-### Project Structure
-
-```
-src/
-├── App.tsx              # Main app component
-├── screens/             # Screen components
-├── components/          # Reusable components
-├── navigation/          # Navigation configuration
-├── types/               # TypeScript type definitions
-└── utils/               # Utility functions
-```
-
-## Available Scripts
-
-- `npm start` - Start Expo development server
-- `npm run ios` - Run on iOS Simulator (macOS)
-- `npm run android` - Run on Android Emulator
-- `npm run web` - Run in web browser
-- `npm test` - Run tests
-- `npm run lint` - Run ESLint
-
-## Building
-
-### Using Expo Go (Development)
-
-Use the Expo Go app on your phone to test your app during development.
-
-### Production Build
-
-Create a production build using EAS Build:
+Quality checks:
 
 ```bash
-# iOS build
-eas build --platform ios
-
-# Android build
-eas build --platform android
-
-# Both platforms
-eas build
+npm run typecheck
+npm run lint
+npm run ci
 ```
 
-## Configuration
+## Codemagic CI/CD
 
-- **app.json** - Expo app configuration (name, version, permissions, etc.)
-- **babel.config.js** - Babel configuration for JSX/TypeScript transpiling
-- **tsconfig.json** - TypeScript compiler options
+The repository includes `codemagic.yaml` with three workflows:
 
-## Customization
+- `expo-quality`: runs TypeScript and ESLint checks on pull requests.
+- `expo-android-release`: generates the Android project with Expo prebuild, signs it, builds an `.aab`, and can publish to Google Play internal testing.
+- `expo-ios-release`: generates the iOS project with Expo prebuild, signs it, builds an `.ipa`, and can submit to TestFlight.
 
-1. Update app branding in `app.json`
-2. Add your screens to `src/screens/`
-3. Configure navigation in `src/navigation/`
-4. Create reusable components in `src/components/`
+Codemagic expects `codemagic.yaml` in the repository root. Commit this repository to GitHub, add it in Codemagic, and scan the selected branch for the YAML configuration.
 
-## Deployment
+### Required Codemagic Setup
 
-### Publish to Expo
+Create these values in Codemagic before running release workflows:
+
+1. Android signing identity
+   - Upload your Android keystore in Team settings > Codemagic.yaml settings > Code signing identities.
+   - Set the keystore reference name to `ios_apps_upload_keystore`.
+
+2. Google Play environment group
+   - Create an environment group named `google_play`.
+   - Add secret variable `GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS` containing the full Google Play service account JSON.
+   - Add `BUILD_NOTIFICATION_EMAIL` with the email address that should receive build results.
+
+3. App Store Connect integration
+   - Create a Codemagic App Store Connect integration named `Codemagic`.
+   - Create an environment group named `app_store_connect`.
+   - Add `BUILD_NOTIFICATION_EMAIL`.
+   - Set `APP_STORE_APP_ID` in `codemagic.yaml` if you want to use App Store build-number lookup later.
+
+4. Apple signing
+   - Make sure the Apple bundle identifier exists: `com.iosapps.app`.
+   - Allow Codemagic automatic signing for App Store distribution, or upload the required certificate and provisioning profile in Codemagic.
+
+## App Identity
+
+Current app identifiers:
+
+- iOS bundle identifier: `com.iosapps.app`
+- Android package name: `com.iosapps.app`
+- Expo slug: `ios-apps`
+
+Change these in `app.json` and `codemagic.yaml` before your first store release if you want a different production identity. Store identifiers become hard to change after release.
+
+## Build Versioning
+
+Codemagic runs `scripts/set-codemagic-build-version.js` before `expo prebuild`. It writes the Codemagic build number into:
+
+- `expo.ios.buildNumber`
+- `expo.android.versionCode`
+
+This keeps App Store Connect and Google Play uploads from reusing build number `1`.
+
+## Android Signing Patch
+
+Expo generates native Android files during CI. `scripts/configure-android-signing.js` patches the generated `android/app/build.gradle` so the release build uses Codemagic keystore variables:
+
+- `CM_KEYSTORE_PATH`
+- `CM_KEYSTORE_PASSWORD`
+- `CM_KEY_ALIAS`
+- `CM_KEY_PASSWORD`
+
+Do not commit keystores, certificates, provisioning profiles, or service account JSON files.
+
+## Useful Commands
 
 ```bash
-# Login to Expo
-expo login
-
-# Publish
-expo publish
+npm run build:ios
+npm run build:android
+npm run submit:ios
+npm run submit:android
 ```
 
-### Build & Deploy
-
-Use EAS Build and EAS Submit for App Store and Play Store deployment:
-
-```bash
-eas build
-eas submit
-```
-
-## Learn More
-
-- [Expo Documentation](https://docs.expo.dev)
-- [React Native Documentation](https://reactnative.dev)
-- [TypeScript Documentation](https://www.typescriptlang.org)
-
-## License
-
-MIT
+These use EAS. Codemagic builds use the checked-in `codemagic.yaml`.

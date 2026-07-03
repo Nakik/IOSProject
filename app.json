@@ -5,28 +5,32 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "cover",
+      "backgroundColor": "#0c1220"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTabletMode": true,
-      "bundleIdentifier": "com.iosapps.app"
+      "bundleIdentifier": "com.iosapps.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.iosapps.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.iosapps.app"
+        "backgroundColor": "#0c1220"
+      }
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
       "favicon": "./assets/favicon.png"
     },
     "scheme": "myapp",
@@ -34,6 +38,26 @@
       "eas": {
         "projectId": "5ffdb98d-1405-41d2-acf3-6c5b9169ef9e"
       }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#f5c75c",
+          "sounds": []
+        }
+      ]
+    ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#f5c75c",
+      "iosDisplayInForeground": true
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
     }
   }
 }
